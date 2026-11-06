@@ -29,7 +29,7 @@ for desired in candidates():
     # Control plane enforces unique names; if a candidate is occupied it
     # may assign an automatic "-1" suffix. Verify the REAL assigned name.
     result = subprocess.run(
-        ["tailscale", "set", f"--hostname={desired}"],
+        (["tailscale", "set", f"--hostname={desired}"] if sys.platform == "win32" else ["sudo", "-n", "tailscale", "set", f"--hostname={desired}"]),
         capture_output=True, text=True,
     )
     if result.returncode != 0:
