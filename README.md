@@ -18,7 +18,7 @@ On-demand desktops using **GitHub-hosted runners**. Choose Windows (native RDP),
 
 | OS | Desktop / server | Username | Port |
 | --- | --- | --- | --- |
-| Windows | Windows RDP | `rdpuser` | 3389 |
+| Windows | Windows RDP (local administrator) | `rdpuser` | 3389 |
 | Linux | XFCE / XRDP | `rdpuser` | 3389 |
 | macOS (experimental) | macrdp / virtual display | `runner` (usually; see summary) | 3390 |
 
@@ -54,3 +54,7 @@ An `InvalidPasswordException` in the Windows account creation step indicates tha
 ## Files
 
 - [Stable hostname allocator](scripts/allocate_hostname.py)
+
+## Windows administrative privileges
+
+On future Windows runs, `rdpuser` is added to the built-in local Administrators group (SID `S-1-5-32-544`) during setup. Sign in as `rdpuser` using the repository secret `RDP_PASSWORD`. For an administrator consent prompt, use `rdpuser` (or `.\rdpuser`), not the pre-existing `runneradmin` account. Existing running jobs do not pick up repository changes; start a new run to use this feature.

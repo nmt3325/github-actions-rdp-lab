@@ -23,6 +23,24 @@ if ($existingUser) {
     New-LocalUser -Name 'rdpuser' -Password $secure -AccountNeverExpires -PasswordNeverExpires -Description 'Temporary RDP user for GitHub Actions' | Out-Null
 }
 Add-LocalGroupMember -Group 'Remote Desktop Users' -Member 'rdpuser' -ErrorAction SilentlyContinue
+# Allow GUI applications launched by rdpuser to request administrator privileges.
+# Resolve the built-in group via its SID so this works on localized Windows.
+$administratorsGroup = (Get-LocalGroup -SID 'S-1-5-32-544').Name
+$rdpUser = Get-LocalUser -Name 'rdpuser'
+$isAdmin = @(Get-LocalGroupMember -Group $administratorsGroup | Where-Object {
+    $_.SID -eq $rdpUser.SID
+}).Count -gt 0
+if (-not $isAdmin) {
+    Add-LocalGroupMember -Group $administratorsGroup -Member 'rdpuser' -ErrorAction Stop
+}
+$isAdmin = @(Get-LocalGroupMember -Group $administratorsGroup | Where-Object {
+    $_.SID -eq $rdpUser.SID
+}).Count -gt 0
+if (-not $isAdmin) {
+    throw 'Could not add rdpuser to the local Administrators group.'
+}
+Write-Host 'rdpuser is a member of local Administrators.'
+
 
 $terminalServer = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
 $rdpTcp = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
