@@ -20,7 +20,6 @@ def assigned_name():
 
 
 def candidates():
-    yield base
     for number in range(1000):
         yield f"{base}-{number:02d}"
 
@@ -55,4 +54,4 @@ for desired in candidates():
             f"last received: {final_fqdn}"
         )
 
-sys.exit("All 1001 hostname candidates were occupied")
+sys.exit("All 1000 hostname candidates were occupied")

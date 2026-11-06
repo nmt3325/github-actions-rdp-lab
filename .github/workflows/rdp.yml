@@ -57,9 +57,9 @@ jobs:
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          hostname: rdp-${{ inputs.os }}
+          hostname: rdp-${{ inputs.os }}-00
 
-      - name: Allocate stable MagicDNS hostname (base, then -00, -01...)
+      - name: Allocate stable MagicDNS hostname (-00, -01, -02...)
         shell: bash
         env:
           SELECTED_OS: ${{ inputs.os }}

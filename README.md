@@ -43,7 +43,7 @@ The Tailscale IP and username are written to the workflow Summary after setup. T
 
 ## Stable hostname / MagicDNS
 
-The runner now requests `rdp-windows`, `rdp-linux`, or `rdp-macos`. If the name is in use in your Tailnet, it tries `rdp-windows-00`, `rdp-windows-01`, etc. (equivalent pattern for other OSes). The actual allocated MagicDNS hostname (including your `*.ts.net` tailnet domain) appears in the job Summary. Set up [MagicDNS](https://tailscale.com/docs/features/magicdns) if needed.
+The runner requests `rdp-windows-00`, `rdp-linux-00`, or `rdp-macos-00` from the initial Tailscale connection. If `-00` is already taken, it tries `-01`, then `-02`, and so on. The actual allocated MagicDNS hostname (including your `*.ts.net` tailnet domain) appears in the job Summary. Set up [MagicDNS](https://tailscale.com/docs/features/magicdns) if needed.
 
 **Machine names are predictable but IP addresses are not fixed.** If you start another session while a prior session is still attached, you get the next free suffix. After a session ends, the ephemeral Tailscale node is removed and its name can be reused. You cannot guarantee a single unchanged endpoint while multiple same-OS sessions are active.
 
