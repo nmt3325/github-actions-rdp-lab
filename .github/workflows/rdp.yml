@@ -1,0 +1,119 @@
+name: On-demand RDP desktops
+
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Choose a desktop operating system
+        required: true
+        type: choice
+        default: linux
+        options:
+          - windows
+          - linux
+          - macos
+      duration_minutes:
+        description: How long to keep the desktop online
+        required: true
+        type: choice
+        default: "300"
+        options:
+          - "30"
+          - "60"
+          - "120"
+          - "240"
+          - "300"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rdp-${{ inputs.os }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: ${{ inputs.os }} desktop
+    runs-on: ${{ inputs.os == 'windows' && 'windows-2025' || inputs.os == 'macos' && 'macos-15' || 'ubuntu-24.04' }}
+    timeout-minutes: 355
+    env:
+      RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+    steps:
+      - name: Verify required secrets
+        shell: bash
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        run: |
+          if [[ -z "$TAILSCALE_AUTHKEY" || -z "$RDP_PASSWORD" ]]; then
+            echo "::error::Set TAILSCALE_AUTHKEY and RDP_PASSWORD in repository Actions secrets."
+            exit 1
+          fi
+          if (( ${#RDP_PASSWORD} < 14 )); then
+            echo "::error::RDP_PASSWORD must be at least 14 characters long."
+            exit 1
+          fi
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Join private Tailscale network
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          hostname: rdp-${{ inputs.os }}-${{ github.run_id }}
+
+      - name: Configure Windows RDP
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/windows-setup.ps1
+
+      - name: Configure Linux XRDP
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/linux-setup.sh
+
+      - name: Configure experimental macOS RDP
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/macos-setup.sh
+
+      - name: Show endpoint in job summary
+        shell: bash
+        env:
+          SELECTED_OS: ${{ inputs.os }}
+        run: |
+          set -euo pipefail
+          TS_IP="$(tailscale ip -4 | head -n 1)"
+          [[ "$TS_IP" == 100.* ]] || { echo "::error::Tailscale IPv4 address missing"; exit 1; }
+          PORT=3389
+          USERNAME=rdpuser
+          if [[ "$SELECTED_OS" == macos ]]; then
+            PORT=3390
+            USERNAME="$(id -un)"
+          fi
+          echo "::notice title=RDP address::$TS_IP:$PORT - Username: $USERNAME"
+          {
+            echo "## Desktop connection"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| OS | $SELECTED_OS |"
+            echo "| Address | \`$TS_IP:$PORT\` |"
+            echo "| Username | \`$USERNAME\` |"
+            echo "| Password | RDP_PASSWORD repository secret |"
+            echo "| Duration | ${{ inputs.duration_minutes }} minutes after setup |"
+            echo
+            echo "Connect from a device signed into your authorized Tailscale tailnet."
+            if [[ "$SELECTED_OS" == macos ]]; then
+              echo
+              echo "**Experimental:** GitHub-hosted macOS may block screen capture and remote input because TCC permissions cannot be granted normally."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep session running
+        shell: bash
+        env:
+          DURATION_MINUTES: ${{ inputs.duration_minutes }}
+        run: |
+          echo "Session available for $DURATION_MINUTES minutes."
+          sleep "$((DURATION_MINUTES * 60))"
