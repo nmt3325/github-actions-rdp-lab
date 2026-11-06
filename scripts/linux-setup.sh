@@ -33,9 +33,18 @@ sudo systemctl enable xrdp
 sudo systemctl restart xrdp-sesman
 sudo systemctl restart xrdp
 sudo systemctl is-active --quiet xrdp
-sudo ss -lnt | grep -F "$TS_IP:3389" >/dev/null || {
+# XRDP's service may report active before the listener has bound; poll first.
+ready=0
+for attempt in $(seq 1 30); do
+  if sudo ss -lnt | grep -F "$TS_IP:3389" >/dev/null; then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$ready" != 1 ]]; then
   echo "XRDP did not listen on Tailscale IPv4 address" >&2
   sudo journalctl -u xrdp --no-pager -n 60
   exit 1
-}
+fi
 echo 'XRDP + XFCE configured and bound to Tailscale.'
