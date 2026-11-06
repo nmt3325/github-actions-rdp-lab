@@ -16,26 +16,23 @@ on:
         description: How long to keep the desktop online
         required: true
         type: choice
-        default: "300"
+        default: "360"
         options:
           - "30"
           - "60"
           - "120"
           - "240"
           - "300"
+          - "360"
 
 permissions:
   contents: read
-
-concurrency:
-  group: rdp-${{ inputs.os }}
-  cancel-in-progress: true
 
 jobs:
   desktop:
     name: ${{ inputs.os }} desktop
     runs-on: ${{ inputs.os == 'windows' && 'windows-2025' || inputs.os == 'macos' && 'macos-15' || 'ubuntu-24.04' }}
-    timeout-minutes: 355
+    timeout-minutes: 360
     env:
       RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
     steps:
@@ -60,7 +57,13 @@ jobs:
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          hostname: rdp-${{ inputs.os }}-${{ github.run_id }}
+          hostname: rdp-${{ inputs.os }}
+
+      - name: Allocate stable MagicDNS hostname (base, then -00, -01...)
+        shell: bash
+        env:
+          SELECTED_OS: ${{ inputs.os }}
+        run: python scripts/allocate_hostname.py "$SELECTED_OS"
 
       - name: Configure Windows RDP
         if: runner.os == 'Windows'
@@ -91,14 +94,16 @@ jobs:
             PORT=3390
             USERNAME="$(id -un)"
           fi
-          echo "::notice title=RDP address::$TS_IP:$PORT - Username: $USERNAME"
+          echo "::notice title=RDP address::$RDP_DNS_NAME:$PORT ($TS_IP:$PORT) - Username: $USERNAME"
           {
             echo "## Desktop connection"
             echo
             echo "| Field | Value |"
             echo "| --- | --- |"
             echo "| OS | $SELECTED_OS |"
-            echo "| Address | \`$TS_IP:$PORT\` |"
+            echo "| Address (MagicDNS) | \`$RDP_DNS_NAME:$PORT\` |"
+            echo "| Short hostname | \`$RDP_HOSTNAME\` |"
+            echo "| Fallback Tailscale IPv4 | \`$TS_IP:$PORT\` |"
             echo "| Username | \`$USERNAME\` |"
             echo "| Password | RDP_PASSWORD repository secret |"
             echo "| Duration | ${{ inputs.duration_minutes }} minutes after setup |"

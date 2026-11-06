@@ -1,5 +1,16 @@
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($env:RDP_PASSWORD)) { throw 'RDP_PASSWORD missing.' }
+# Windows local accounts are subject to password complexity policy.
+# Validate before trying New-LocalUser; never print the password.
+$p = $env:RDP_PASSWORD
+if ($p.Length -lt 14 -or
+    $p -cnotmatch '[A-Z]' -or
+    $p -cnotmatch '[a-z]' -or
+    $p -notmatch '[0-9]' -or
+    $p -notmatch '[^A-Za-z0-9]' -or
+    $p -match '(?i)rdpuser') {
+    throw 'RDP_PASSWORD does not meet recommended Windows policy: at least 14 characters, uppercase, lowercase, number, symbol, and must not contain rdpuser. Update the GitHub Actions secret.'
+}
 
 $tailIp = (tailscale ip -4 | Select-Object -First 1).Trim()
 if ($tailIp -notmatch '^100\.') { throw 'Tailscale IP not found.' }
