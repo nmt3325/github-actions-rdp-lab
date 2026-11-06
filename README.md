@@ -26,7 +26,7 @@ The Tailscale IP and username are written to the workflow Summary after setup. T
 
 ## Limitations and security
 
-- GitHub-hosted jobs have a **six-hour maximum**. Setup and cleanup take time, so this workflow allows selecting up to 360 minutes of RDP hold time; the six-hour job limit still ends the run and the job timeout to 360 minutes.
+- GitHub-hosted jobs have a **six-hour maximum (360 minutes)**. The workflow defaults to this maximum, but installation and setup count toward the limit, so actual RDP access lasts slightly less than six hours.
 - Only people authorized in your Tailscale network can reach the RDP service. Configure **Tailscale ACLs** to restrict access further. A tagged or ephemeral auth key is recommended; rotate it if compromised.
 - Windows enforces RDP Network Level Authentication (NLA) and restricts incoming TCP 3389 to the current Tailscale address. Linux XRDP binds directly to the Tailscale address.
 - The macOS experiment uses macrdp's documented test-only `--skip-auth` with a password file, bound to the Tailscale address. Its security guarantees are **not equivalent** to standard local-account PAM authentication and it should not be used for sensitive workloads.

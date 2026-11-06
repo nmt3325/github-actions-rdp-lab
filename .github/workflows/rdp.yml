@@ -106,7 +106,7 @@ jobs:
             echo "| Fallback Tailscale IPv4 | \`$TS_IP:$PORT\` |"
             echo "| Username | \`$USERNAME\` |"
             echo "| Password | RDP_PASSWORD repository secret |"
-            echo "| Duration | ${{ inputs.duration_minutes }} minutes after setup |"
+            echo "| Requested duration | ${{ inputs.duration_minutes }} minutes (subject to 360-minute total job cap) |"
             echo
             echo "Connect from a device signed into your authorized Tailscale tailnet."
             if [[ "$SELECTED_OS" == macos ]]; then
