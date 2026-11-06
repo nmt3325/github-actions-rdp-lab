@@ -13,7 +13,7 @@ base = f"rdp-{system}"
 
 
 def assigned_name():
-    raw = subprocess.check_output(["tailscale", "status", "--json"], text=True)
+    raw = subprocess.check_output(["tailscale", "status", "--json"], text=True, encoding="utf-8", errors="strict")
     self = (json.loads(raw).get("Self") or {})
     fqdn = (self.get("DNSName") or "").rstrip(".").lower()
     return fqdn.split(".", 1)[0], fqdn
@@ -30,7 +30,7 @@ for desired in candidates():
     # may assign an automatic "-1" suffix. Verify the REAL assigned name.
     result = subprocess.run(
         (["tailscale", "set", f"--hostname={desired}"] if sys.platform == "win32" else ["sudo", "-n", "tailscale", "set", f"--hostname={desired}"]),
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     if result.returncode != 0:
         sys.exit(f"Unable to set Tailscale hostname {desired}: {result.stderr.strip()}")
