@@ -5,28 +5,65 @@ set -euo pipefail
 TS_IP="$(tailscale ip -4 | head -n 1)"
 [[ "$TS_IP" == 100.* ]] || { echo "Tailscale IP not found" >&2; exit 1; }
 
-echo 'WARNING: macOS GitHub-hosted runners may lack TCC Screen Recording and Accessibility grants.'
-echo 'This option builds macrdp for experimental remote access. No TCC bypass is attempted.'
+# Native macOS RDP server; macOS GitHub-hosted runners might not provide
+# interactive Screen Recording and Accessibility consent (TCC).
+echo 'WARNING: hosted macOS may deny Screen Recording and Accessibility.'
 
-git clone --depth=1 --branch v0.9.11 https://github.com/clintcan/macrdp.git "$RUNNER_TEMP/macrdp-source"
-cd "$RUNNER_TEMP/macrdp-source"
-cargo build --release
-codesign -s - --force target/release/macrdp
+# v0.9.11 is pinned to a verified, official Apple Silicon release asset.
+# Downloading the release saves ~6-7 minutes of recompiling Rust each run.
+VERSION="v0.9.11"
+ASSET="macrdp-${VERSION}-aarch64-apple-darwin.tar.gz"
+EXPECTED_SHA256="63ce4467069951a627ebf8a30bb477f1c0a5e85bea68444725b2bfede80f13b6"
+ARTIFACT_DIR="${RUNNER_TEMP}/macrdp-release"
+mkdir -p "$ARTIFACT_DIR"
+curl --fail --location --show-error --silent --retry 3 --retry-delay 2 \
+  "https://github.com/clintcan/macrdp/releases/download/${VERSION}/${ASSET}" \
+  -o "${ARTIFACT_DIR}/${ASSET}"
+printf '%s  %s\n' "$EXPECTED_SHA256" "${ARTIFACT_DIR}/${ASSET}" | shasum -a 256 --check
+tar -xzf "${ARTIFACT_DIR}/${ASSET}" -C "$ARTIFACT_DIR"
+MACRDP_BIN="$(find "$ARTIFACT_DIR" -type f -name macrdp -print -quit)"
+[[ -n "$MACRDP_BIN" ]] || { echo "Official macrdp tarball did not contain a macrdp executable" >&2; exit 1; }
+chmod +x "$MACRDP_BIN"
+codesign --force --sign - "$MACRDP_BIN"
 
-PASSWORD_FILE="$RUNNER_TEMP/.macrdp-pass"
-(umask 077; printf '%s\n' "$RDP_PASSWORD" > "$PASSWORD_FILE")
-chmod 600 "$PASSWORD_FILE"
-
-nohup target/release/macrdp \
-  --bind "$TS_IP:3390" \
-  --skip-auth \
-  --password-file "$PASSWORD_FILE" \
-  --virtual-display --width 1440 --height 900 \
-  > "$RUNNER_TEMP/macrdp.log" 2>&1 &
-echo $! > "$RUNNER_TEMP/macrdp.pid"
-sleep 8
-if ! kill -0 "$(cat "$RUNNER_TEMP/macrdp.pid")" 2>/dev/null; then
-  cat "$RUNNER_TEMP/macrdp.log"
+# --password-file is NOT a supported macrdp flag. Use the documented
+# --keychain option instead, keeping the password out of process argv.
+# The skip-auth flag is only suitable here because access is Tailscale-only.
+USERNAME="$(id -un)"
+security add-generic-password -U -a "$USERNAME" -s macrdp \
+  -w "$RDP_PASSWORD" -T /usr/bin/security
+if ! security find-generic-password -s macrdp -a "$USERNAME" -w >/dev/null; then
+  echo 'Unable to read macrdp credential from macOS Keychain.' >&2
   exit 1
 fi
-echo 'Experimental macrdp is running. Connection may show a blank screen or reject input without interactive TCC consent.'
+
+LOG_FILE="${RUNNER_TEMP}/macrdp.log"
+echo "Launching macrdp on private Tailscale ${TS_IP}:3390..."
+nohup "$MACRDP_BIN" \
+  --bind "${TS_IP}:3390" \
+  --username "$USERNAME" \
+  --skip-auth \
+  --keychain \
+  --virtual-display --width 1440 --height 900 \
+  --map-ctrl-to-cmd \
+  >"$LOG_FILE" 2>&1 < /dev/null &
+MACRDP_PID=$!
+echo "$MACRDP_PID" > "${RUNNER_TEMP}/macrdp.pid"
+
+for attempt in $(seq 1 20); do
+  if ! kill -0 "$MACRDP_PID" 2>/dev/null; then
+    echo 'macrdp exited unexpectedly:' >&2
+    tail -80 "$LOG_FILE" >&2 || true
+    exit 1
+  fi
+  if nc -z -G 2 "$TS_IP" 3390 2>/dev/null; then
+    echo "macrdp RDP server is listening on ${TS_IP}:3390."
+    echo 'Note: a listening port does not confirm GUI capture/input permissions.'
+    exit 0
+  fi
+  sleep 1
+done
+
+echo 'macrdp did not begin listening on the Tailscale address:' >&2
+tail -80 "$LOG_FILE" >&2 || true
+exit 1

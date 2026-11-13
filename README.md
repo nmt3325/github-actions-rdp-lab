@@ -29,7 +29,7 @@ The Tailscale IP and username are written to the workflow Summary after setup. T
 - GitHub-hosted jobs have a **six-hour maximum (360 minutes)**. The workflow defaults to this maximum, but installation and setup count toward the limit, so actual RDP access lasts slightly less than six hours.
 - Only people authorized in your Tailscale network can reach the RDP service. Configure **Tailscale ACLs** to restrict access further. A tagged or ephemeral auth key is recommended; rotate it if compromised.
 - Windows enforces RDP Network Level Authentication (NLA) and restricts incoming TCP 3389 to the current Tailscale address. Linux XRDP binds directly to the Tailscale address.
-- The macOS experiment uses macrdp's documented test-only `--skip-auth` with a password file, bound to the Tailscale address. Its security guarantees are **not equivalent** to standard local-account PAM authentication and it should not be used for sensitive workloads.
+- The macOS experiment uses macrdp's documented `--skip-auth` with an ephemeral macOS Keychain credential (`--keychain`), bound to the Tailscale address. Its security guarantees are **not equivalent** to standard local-account PAM authentication and it should not be used for sensitive workloads.
 - Never add credentials to the repository, action arguments, or logs. Avoid running pull-request code in these privileged workflows.
 - GitHub may restrict or bill for hosted-runner usage, and its Actions acceptable-use terms apply. This is not a permanent remote desktop hosting service.
 - If the Microsoft Windows image or macOS screen-capture policies change, those environments may not be available. Troubleshoot the step logs.
@@ -58,3 +58,7 @@ An `InvalidPasswordException` in the Windows account creation step indicates tha
 ## Windows administrative privileges
 
 On future Windows runs, `rdpuser` is added to the built-in local Administrators group (SID `S-1-5-32-544`) during setup. Sign in as `rdpuser` using the repository secret `RDP_PASSWORD`. For an administrator consent prompt, use `rdpuser` (or `.\rdpuser`), not the pre-existing `runneradmin` account. Existing running jobs do not pick up repository changes; start a new run to use this feature.
+
+## macOS release binary and TCC
+
+The macOS setup downloads the verified macrdp v0.9.11 Apple Silicon release tarball (SHA-256 pinned) rather than compiling from source on each run. It stores the RDP_PASSWORD secret in the temporary runner Keychain and runs with `--keychain --skip-auth`; this bypasses local macOS PAM and is only suitable for a trusted, access-controlled Tailnet. No public RDP port is exposed. macOS hosted runners may still lack Screen Recording/Accessibility approval: a successful TCP-listen check does **not** prove that the GUI is usable.
