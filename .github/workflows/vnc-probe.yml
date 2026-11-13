@@ -1,0 +1,77 @@
+name: Probe VNC authentication
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Current macOS Tailscale IPv4 or MagicDNS
+        required: true
+        type: string
+        default: rdp-macos-00
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+      VNC_PASSWORD: ${{ secrets.VNC_PASSWORD }}
+      VNC_HOST: ${{ inputs.target }}
+    steps:
+      - name: Connect to Tailnet
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          hostname: vnc-probe-${{ github.run_id }}
+      - name: Install DES test library
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/vnc-venv"
+          "$RUNNER_TEMP/vnc-venv/bin/pip" --disable-pip-version-check -q install pycryptodome==3.23.0
+      - name: Verify legacy VNC authentication and framebuffer init
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/vnc-venv/bin/python" - <<'PY'
+          import os, socket, struct
+          from Crypto.Cipher import DES
+
+          host = os.environ['VNC_HOST']
+          raw = os.environ.get('VNC_PASSWORD') or os.environ['RDP_PASSWORD'][:8]
+          if len(raw) != 8 or any(not (33 <= ord(ch) <= 126) for ch in raw):
+              raise SystemExit('VNC password is not eight printable ASCII characters')
+
+          def readn(sock, n):
+              data = b''
+              while len(data) < n:
+                  chunk = sock.recv(n-len(data))
+                  if not chunk:
+                      raise EOFError('VNC socket closed unexpectedly')
+                  data += chunk
+              return data
+
+          with socket.create_connection((host,5900),timeout=12) as sock:
+              sock.settimeout(15)
+              banner = readn(sock,12)
+              print('Server RFB protocol:',banner.decode('ascii','replace').strip())
+              assert banner.startswith(b'RFB 003.'), 'Not an RFB/VNC server'
+              sock.sendall(b'RFB 003.008\n')
+              n = readn(sock,1)[0]
+              types = readn(sock,n)
+              print('Supported RFB security types:',list(types))
+              assert 2 in types, 'Legacy VNC authentication (type 2) not offered'
+              sock.sendall(b'\x02')
+              challenge = readn(sock,16)
+              key = bytes(int(f'{b:08b}'[::-1], 2) for b in raw.encode('ascii'))
+              response = DES.new(key,DES.MODE_ECB).encrypt(challenge)
+              sock.sendall(response)
+              result = struct.unpack('>I',readn(sock,4))[0]
+              assert result == 0, f'VNC password authentication rejected (code {result})'
+              print('VNC password authentication succeeded')
+              sock.sendall(b'\x01')
+              width,height = struct.unpack('>HH',readn(sock,4))
+              pixfmt = readn(sock,16)
+              name_len = struct.unpack('>I',readn(sock,4))[0]
+              name = readn(sock,min(name_len,4096))
+              print(f'VNC framebuffer initialized: {width}x{height}; desktop name: {name.decode("utf-8","replace")[:100]}')
+          PY
