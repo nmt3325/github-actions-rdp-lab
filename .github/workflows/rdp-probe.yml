@@ -1,0 +1,64 @@
+name: Probe macOS RDP authentication
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Current macOS RDP Tailscale IP or full MagicDNS name
+        required: true
+        default: rdp-macos-00
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      RDP_TARGET: ${{ inputs.target }}
+      RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+    steps:
+      - name: Validate config
+        shell: bash
+        env:
+          TS_KEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$TS_KEY" && -n "$RDP_PASSWORD" ]]
+          [[ "$RDP_TARGET" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::Invalid target hostname"; exit 1; }
+      - name: Connect probe to Tailnet
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          hostname: rdp-probe-${{ github.run_id }}
+      - name: Resolve and TCP connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Testing TCP ${RDP_TARGET}:3390"
+          getent ahostsv4 "$RDP_TARGET" | head -3 || true
+          timeout 12 bash -c 'echo >/dev/tcp/"$1"/3390' _ "$RDP_TARGET" || {
+            echo "::warning::Probe node cannot reach RDP port. May be Tailnet ACL restricting probe nodes."
+          }
+      - name: Install headless FreeRDP client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq freerdp2-x11 xvfb xauth
+      - name: Verify RDP NLA authentication
+        shell: bash
+        run: |
+          set +e
+          echo "Testing FreeRDP NLA authentication (GUI screen capture is NOT tested)."
+          # Hide the password from shell traces and process output.
+          timeout 45s xvfb-run -a xfreerdp \
+            "/v:${RDP_TARGET}:3390" "/u:rdpuser" "/p:${RDP_PASSWORD}" \
+            +auth-only /cert:ignore /log-level:INFO 2>&1 \
+            | sed -E 's/(password|passwd|secret)[=:][^ ]+/[REDACTED]/Ig'
+          code=${PIPESTATUS[0]}
+          echo "FreeRDP exit code: $code"
+          if [[ "$code" != 0 ]]; then
+            echo "::warning::RDP authentication was not verified; check preceding negotiation errors."
+            exit 1
+          fi
+          echo "RDP network negotiation and NLA authentication succeeded."
