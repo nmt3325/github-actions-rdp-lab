@@ -87,5 +87,24 @@ jobs:
               assert 0 < size <= 1048576, f'Unexpected rectangle size {size}'
               pixels = readn(sock,size)
               print(f'VNC screen pixel delivery succeeded: {rw}x{rh}, {len(pixels)} bytes, unique byte values={len(set(pixels))}')
+              # Sample center and other locations to distinguish a blank display
+              # from a black pixel at the top-left corner.
+              for xpos,ypos in ((width//2,height//2),(width//4,height//2),(3*width//4,height//2)):
+                  xpos=min(xpos,width-128)
+                  ypos=min(ypos,height-128)
+                  sock.sendall(b'\x03\x00'+struct.pack('>HHHH',xpos,ypos,128,128))
+                  mt=readn(sock,1)[0]
+                  assert mt == 0, f'Expected frame update, got {mt}'
+                  _,nr=struct.unpack('>BH',readn(sock,3))
+                  assert nr>0
+                  buf=b''
+                  for _ in range(nr):
+                      rx,ry,rw,rh,encoding=struct.unpack('>HHHHi',readn(sock,12))
+                      assert encoding == 0, f'Unexpected rectangle encoding {encoding}'
+                      size=rw*rh*(pixfmt[0]//8)
+                      assert 0<size<=4*1024*1024
+                      buf+=readn(sock,size)
+                  print(f'VNC sampled at ({xpos},{ypos}): distinct byte values={len(set(buf))}, bytes={len(buf)}')
+
 
           PY
