@@ -121,7 +121,7 @@ jobs:
               echo "| VNC macOS user | \`rdpuser\` with RDP_PASSWORD |"
               echo "| VNC legacy password | VNC_PASSWORD secret; otherwise first 8 ASCII characters of RDP_PASSWORD |"
               echo
-              echo "**Experimental:** GitHub-hosted macOS may block screen capture and remote input because TCC permissions cannot be granted normally."
+              echo "**Experimental:** RDP/VNC TCP and authentication can work while the screen stays black. The VNC port handshake does not verify usable pixels or remote input; macOS Screen Sharing/TCC approval may require GUI or MDM."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 

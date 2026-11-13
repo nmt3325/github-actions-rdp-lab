@@ -58,8 +58,8 @@ except OSError:
 raise SystemExit(1)
 PY
   then
-    echo "VNC available on $TS_IP:5900 (RFB handshake confirmed)."
-    echo "Screen sharing may be view-only due to macOS policy."
+    echo "VNC TCP/RFB service reachable at $TS_IP:5900; screen capture NOT verified."
+    echo "::warning::GitHub-hosted macOS may return an all-black VNC framebuffer despite successful RFB authentication due to Screen Sharing/TCC approval restrictions."
     exit 0
   fi
   sleep 2
