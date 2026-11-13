@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           echo "Testing TCP ${RDP_TARGET}:${RDP_PORT}"
           getent ahostsv4 "$RDP_TARGET" | head -3 || true
-          timeout 12 bash -c 'echo >/dev/tcp/"$1"/${RDP_PORT}' _ "$RDP_TARGET" || {
+          timeout 12 bash -c 'echo >/dev/tcp/"$1"/"$2"' _ "$RDP_TARGET" "$RDP_PORT" || {
             echo "::warning::Probe node cannot reach RDP port. May be Tailnet ACL restricting probe nodes."
           }
       - name: Install headless FreeRDP client
