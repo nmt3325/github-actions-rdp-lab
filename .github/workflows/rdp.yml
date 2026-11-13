@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 360
     env:
       RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+      VNC_PASSWORD: ${{ secrets.VNC_PASSWORD }}
     steps:
       - name: Verify required secrets
         shell: bash
@@ -80,6 +81,11 @@ jobs:
         shell: bash
         run: bash scripts/macos-setup.sh
 
+      - name: Configure macOS VNC (Apple Screen Sharing)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/macos-vnc-setup.sh
+
       - name: Show endpoint in job summary
         shell: bash
         env:
@@ -111,6 +117,9 @@ jobs:
             echo "Connect from a device signed into your authorized Tailscale tailnet."
             if [[ "$SELECTED_OS" == macos ]]; then
               echo "| Compatibility address | \`$RDP_DNS_NAME:3390\` |"
+              echo "| VNC address | \`$RDP_DNS_NAME:5900\` |"
+              echo "| VNC macOS user | \`rdpuser\` with RDP_PASSWORD |"
+              echo "| VNC legacy password | VNC_PASSWORD secret; otherwise first 8 ASCII characters of RDP_PASSWORD |"
               echo
               echo "**Experimental:** GitHub-hosted macOS may block screen capture and remote input because TCC permissions cannot be granted normally."
             fi

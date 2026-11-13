@@ -20,7 +20,7 @@ On-demand desktops using **GitHub-hosted runners**. Choose Windows (native RDP),
 | --- | --- | --- | --- |
 | Windows | Windows RDP (local administrator) | `rdpuser` | 3389 |
 | Linux | XFCE / XRDP | `rdpuser` | 3389 |
-| macOS (experimental) | macrdp / virtual display | `rdpuser` (temporary local administrator) | 3389 (3390 also supported) |
+| macOS (experimental) | RDP + Apple Screen Sharing (VNC) | `rdpuser` (temporary local administrator) | RDP 3389/3390, VNC 5900 |
 
 The Tailscale IP and username are written to the workflow Summary after setup. The password is never printed. When the requested time ends, or you cancel the workflow, access stops and the runner is deleted.
 
@@ -66,3 +66,9 @@ The macOS setup downloads the verified macrdp v0.9.11 Apple Silicon release tarb
 ## macOS standard RDP port
 
 In future macOS runs, `macrdp` listens on TCP **3389** (the RDP standard) on the Tailscale address, so clients can use the hostname without a port. A TCP relay on the same Tailscale address preserves compatibility with the former `:3390` port. This change does **not** affect already-running GitHub Actions sessions; those still require `:3390`. Both ports are only available to tailnet peers permitted by your Tailscale ACL.
+
+## macOS VNC (Apple Screen Sharing, experimental)
+
+New macOS runs also attempt to enable Apple's built-in Screen Sharing on TCP 5900 and check an RFB handshake, alongside the existing RDP service. Open `vnc://rdp-macos-00.<your-tailnet>.ts.net:5900` in the macOS Screen Sharing app or any compatible VNC viewer from your allowed Tailscale network. For Apple Screen Sharing, log in as `rdpuser` using the `RDP_PASSWORD` repository secret. For a legacy VNC viewer requesting only a VNC password, you may set an optional `VNC_PASSWORD` repository secret to **exactly 8 printable ASCII characters**. If unset, the first eight ASCII characters of `RDP_PASSWORD` are used as the VNC legacy password. Legacy VNC passwords are short; never expose VNC publicly and enforce a restrictive Tailscale policy.
+
+**macOS caveat:** Apple restricts command-line Screen Sharing activation on macOS 12.1+, and access may be view-only or require interactive/MDM approval. A successful port/handshake test does not guarantee usable screen capture or keyboard/mouse input. An existing macOS run does not inherit these changes. [VNC setup script](scripts/macos-vnc-setup.sh).
