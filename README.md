@@ -20,7 +20,7 @@ On-demand desktops using **GitHub-hosted runners**. Choose Windows (native RDP),
 | --- | --- | --- | --- |
 | Windows | Windows RDP (local administrator) | `rdpuser` | 3389 |
 | Linux | XFCE / XRDP | `rdpuser` | 3389 |
-| macOS (experimental) | macrdp / virtual display | `rdpuser` (temporary local administrator) | 3390 |
+| macOS (experimental) | macrdp / virtual display | `rdpuser` (temporary local administrator) | 3389 (3390 also supported) |
 
 The Tailscale IP and username are written to the workflow Summary after setup. The password is never printed. When the requested time ends, or you cancel the workflow, access stops and the runner is deleted.
 
@@ -62,3 +62,7 @@ On future Windows runs, `rdpuser` is added to the built-in local Administrators 
 ## macOS release binary and TCC
 
 The macOS setup downloads the verified macrdp v0.9.11 Apple Silicon release tarball (SHA-256 pinned) rather than compiling from source on each run. It creates an ephemeral macOS `rdpuser` administrator account with the RDP_PASSWORD secret, verifies local authentication, and stores the same credential in the temporary runner Keychain. macrdp runs with `--keychain` and validates the account through PAM. `--skip-auth` is intentionally not used, as macrdp refuses it on a non-loopback listener. No public RDP port is exposed. macOS hosted runners may still lack Screen Recording/Accessibility approval: a successful TCP-listen check does **not** prove that the GUI is usable.
+
+## macOS standard RDP port
+
+In future macOS runs, `macrdp` listens on TCP **3389** (the RDP standard) on the Tailscale address, so clients can use the hostname without a port. A TCP relay on the same Tailscale address preserves compatibility with the former `:3390` port. This change does **not** affect already-running GitHub Actions sessions; those still require `:3390`. Both ports are only available to tailnet peers permitted by your Tailscale ACL.

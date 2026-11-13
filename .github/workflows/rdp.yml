@@ -91,7 +91,7 @@ jobs:
           PORT=3389
           USERNAME=rdpuser
           if [[ "$SELECTED_OS" == macos ]]; then
-            PORT=3390
+            PORT=3389
             USERNAME=rdpuser
           fi
           echo "::notice title=RDP address::$RDP_DNS_NAME:$PORT ($TS_IP:$PORT) - Username: $USERNAME"
@@ -110,6 +110,7 @@ jobs:
             echo
             echo "Connect from a device signed into your authorized Tailscale tailnet."
             if [[ "$SELECTED_OS" == macos ]]; then
+              echo "| Compatibility address | \`$RDP_DNS_NAME:3390\` |"
               echo
               echo "**Experimental:** GitHub-hosted macOS may block screen capture and remote input because TCC permissions cannot be granted normally."
             fi
