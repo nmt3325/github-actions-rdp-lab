@@ -26,10 +26,15 @@ MACRDP_BIN="$(find "$ARTIFACT_DIR" -type f -name macrdp -print -quit)"
 chmod +x "$MACRDP_BIN"
 codesign --force --sign - "$MACRDP_BIN"
 
-# --password-file is NOT a supported macrdp flag. Use the documented
-# --keychain option instead, keeping the password out of process argv.
-# The skip-auth flag is only suitable here because access is Tailscale-only.
+# macrdp refuses --skip-auth on non-loopback binds. Change the temporary
+# GitHub-hosted local user's password so PAM can authenticate the RDP session.
+# This runner is discarded when the Actions job ends.
 USERNAME="$(id -un)"
+sudo dscl . -passwd "/Users/${USERNAME}" "$RDP_PASSWORD"
+
+# --password-file is not supported. Store the credential in the runner's
+# ephemeral Keychain, and let macrdp read it via --keychain (not process argv).
+
 security add-generic-password -U -a "$USERNAME" -s macrdp \
   -w "$RDP_PASSWORD" -T /usr/bin/security
 if ! security find-generic-password -s macrdp -a "$USERNAME" -w >/dev/null; then
@@ -42,7 +47,6 @@ echo "Launching macrdp on private Tailscale ${TS_IP}:3390..."
 nohup "$MACRDP_BIN" \
   --bind "${TS_IP}:3390" \
   --username "$USERNAME" \
-  --skip-auth \
   --keychain \
   --virtual-display --width 1440 --height 900 \
   --map-ctrl-to-cmd \
