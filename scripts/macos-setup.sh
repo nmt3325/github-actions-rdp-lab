@@ -26,11 +26,14 @@ MACRDP_BIN="$(find "$ARTIFACT_DIR" -type f -name macrdp -print -quit)"
 chmod +x "$MACRDP_BIN"
 codesign --force --sign - "$MACRDP_BIN"
 
-# macrdp refuses --skip-auth on non-loopback binds. Change the temporary
-# GitHub-hosted local user's password so PAM can authenticate the RDP session.
-# This runner is discarded when the Actions job ends.
-USERNAME="$(id -un)"
-sudo dscl . -passwd "/Users/${USERNAME}" "$RDP_PASSWORD"
+# macrdp refuses --skip-auth on non-loopback binds.
+# Create a separate, temporary local macOS account for PAM authentication.
+# Avoid changing the GitHub-hosted runner user's existing password.
+USERNAME="rdpuser"
+sudo sysadminctl -addUser "$USERNAME" -fullName "Temporary RDP User" \
+  -password "$RDP_PASSWORD" -admin
+id "$USERNAME" >/dev/null
+sudo dscl . -authonly "$USERNAME" "$RDP_PASSWORD"
 
 # --password-file is not supported. Store the credential in the runner's
 # ephemeral Keychain, and let macrdp read it via --keychain (not process argv).

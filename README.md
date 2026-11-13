@@ -20,7 +20,7 @@ On-demand desktops using **GitHub-hosted runners**. Choose Windows (native RDP),
 | --- | --- | --- | --- |
 | Windows | Windows RDP (local administrator) | `rdpuser` | 3389 |
 | Linux | XFCE / XRDP | `rdpuser` | 3389 |
-| macOS (experimental) | macrdp / virtual display | `runner` (usually; see summary) | 3390 |
+| macOS (experimental) | macrdp / virtual display | `rdpuser` (temporary local administrator) | 3390 |
 
 The Tailscale IP and username are written to the workflow Summary after setup. The password is never printed. When the requested time ends, or you cancel the workflow, access stops and the runner is deleted.
 
@@ -29,7 +29,7 @@ The Tailscale IP and username are written to the workflow Summary after setup. T
 - GitHub-hosted jobs have a **six-hour maximum (360 minutes)**. The workflow defaults to this maximum, but installation and setup count toward the limit, so actual RDP access lasts slightly less than six hours.
 - Only people authorized in your Tailscale network can reach the RDP service. Configure **Tailscale ACLs** to restrict access further. A tagged or ephemeral auth key is recommended; rotate it if compromised.
 - Windows enforces RDP Network Level Authentication (NLA) and restricts incoming TCP 3389 to the current Tailscale address. Linux XRDP binds directly to the Tailscale address.
-- The macOS experiment uses macrdp's normal PAM authentication with a temporary password set on the GitHub-hosted `runner` account and stored in the ephemeral macOS Keychain (`--keychain`); it listens only on the Tailscale address. Its security guarantees are **not equivalent** to standard local-account PAM authentication and it should not be used for sensitive workloads.
+- The macOS experiment uses macrdp's normal PAM authentication with a temporary local `rdpuser` account created with the repository password and stored in the ephemeral macOS Keychain (`--keychain`); it listens only on the Tailscale address. Its security guarantees are **not equivalent** to standard local-account PAM authentication and it should not be used for sensitive workloads.
 - Never add credentials to the repository, action arguments, or logs. Avoid running pull-request code in these privileged workflows.
 - GitHub may restrict or bill for hosted-runner usage, and its Actions acceptable-use terms apply. This is not a permanent remote desktop hosting service.
 - If the Microsoft Windows image or macOS screen-capture policies change, those environments may not be available. Troubleshoot the step logs.
@@ -61,4 +61,4 @@ On future Windows runs, `rdpuser` is added to the built-in local Administrators 
 
 ## macOS release binary and TCC
 
-The macOS setup downloads the verified macrdp v0.9.11 Apple Silicon release tarball (SHA-256 pinned) rather than compiling from source on each run. It sets the ephemeral macOS runner account password to the RDP_PASSWORD secret and stores the same credential in the temporary runner Keychain. macrdp runs with `--keychain` and validates the account through PAM. `--skip-auth` is intentionally not used, as macrdp refuses it on a non-loopback listener. No public RDP port is exposed. macOS hosted runners may still lack Screen Recording/Accessibility approval: a successful TCP-listen check does **not** prove that the GUI is usable.
+The macOS setup downloads the verified macrdp v0.9.11 Apple Silicon release tarball (SHA-256 pinned) rather than compiling from source on each run. It creates an ephemeral macOS `rdpuser` administrator account with the RDP_PASSWORD secret, verifies local authentication, and stores the same credential in the temporary runner Keychain. macrdp runs with `--keychain` and validates the account through PAM. `--skip-auth` is intentionally not used, as macrdp refuses it on a non-loopback listener. No public RDP port is exposed. macOS hosted runners may still lack Screen Recording/Accessibility approval: a successful TCP-listen check does **not** prove that the GUI is usable.

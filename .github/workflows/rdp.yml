@@ -92,7 +92,7 @@ jobs:
           USERNAME=rdpuser
           if [[ "$SELECTED_OS" == macos ]]; then
             PORT=3390
-            USERNAME="$(id -un)"
+            USERNAME=rdpuser
           fi
           echo "::notice title=RDP address::$RDP_DNS_NAME:$PORT ($TS_IP:$PORT) - Username: $USERNAME"
           {
