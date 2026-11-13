@@ -62,3 +62,23 @@ jobs:
             exit 1
           fi
           echo "RDP network negotiation and NLA authentication succeeded."
+
+      - name: Attempt full graphical RDP session
+        shell: bash
+        run: |
+          set +e
+          echo "Testing a full RDP graphical session for up to 15 seconds (without saving screenshots)."
+          timeout 15s xvfb-run -a xfreerdp \
+            "/v:${RDP_TARGET}:3390" "/u:rdpuser" "/p:${RDP_PASSWORD}" \
+            /cert:ignore /log-level:INFO /size:1280x720 /bpp:24 2>&1 \
+            | sed -E 's/(password|passwd|secret)[=:][^ ]+/[REDACTED]/Ig'
+          code=${PIPESTATUS[0]}
+          echo "Full RDP client exit code: $code"
+          if [[ "$code" == 124 ]]; then
+            echo "RDP graphical session remained connected for 15 seconds (timeout expected)."
+          elif [[ "$code" != 0 ]]; then
+            echo "::warning::Graphical session failed or disconnected (NLA may still be valid)."
+          else
+            echo "RDP client ended cleanly."
+          fi
+          exit 0
