@@ -74,4 +74,18 @@ jobs:
               name_len = struct.unpack('>I',readn(sock,4))[0]
               name = readn(sock,min(name_len,4096))
               print(f'VNC framebuffer initialized: {width}x{height}; desktop name: {name.decode("utf-8","replace")[:100]}')
+              # Request a small raw rectangle and confirm pixels arrive.
+              sock.sendall(b'\x02\x00\x00\x01\x00\x00\x00\x00')  # SetEncodings: raw
+              sock.sendall(b'\x03\x00'+struct.pack('>HHHH',0,0,32,32))
+              t = readn(sock,1)[0]
+              assert t == 0, f'Expected FramebufferUpdate (0), got {t}'
+              _,nrect = struct.unpack('>BH',readn(sock,3))
+              assert nrect > 0, 'No updated rectangles'
+              rx,ry,rw,rh,encoding=struct.unpack('>HHHHi',readn(sock,12))
+              assert encoding == 0, f'Expected raw pixel rectangle; got {encoding}'
+              size = rw*rh*(pixfmt[0]//8)
+              assert 0 < size <= 1048576, f'Unexpected rectangle size {size}'
+              pixels = readn(sock,size)
+              print(f'VNC screen pixel delivery succeeded: {rw}x{rh}, {len(pixels)} bytes, unique byte values={len(set(pixels))}')
+
           PY
